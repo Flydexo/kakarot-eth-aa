@@ -1,0 +1,33 @@
+# IDE
+.vscode
+.idea
+
+# Python
+__pycache__
+venv
+
+# starknet
+node.json
+*.deployments.txt
+artifacts
+/build
+
+#foundry
+/cache
+/out
+
+# nile
+127.0.0.1.*
+
+# Protostar
+./build
+*logs.json
+
+.DS_Store
+.env
+
+lint.sarif
+kakarot.code-workspace
+coverage/*
+
+# Scripts artifacts
