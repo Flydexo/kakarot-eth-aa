@@ -19,6 +19,6 @@ jobs:
     - name: Install requirements
       run: make setup
     - name: Run tests and collect coverage
-      run: pytest --cov=./ --cov-report=xml
+      run: make test
     - name: Upload coverage reports to Codecov with GitHub Action
       uses: codecov/codecov-action@v3
