@@ -1,0 +1,24 @@
+name: CodeCov
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    name: Python tests
+    defaults:
+      run:
+        working-directory: .
+    steps:
+    - uses: actions/checkout@v1
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.9'
+    - name: Install poetry
+      run: curl -sSL https://install.python-poetry.org | python3 -
+    - name: Install requirements
+      run: make setup
+    - name: Run tests and collect coverage
+      run: pytest --cov=./ --cov-report=xml
+    - name: Upload coverage reports to Codecov with GitHub Action
+      uses: codecov/codecov-action@v3
