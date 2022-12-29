@@ -31,3 +31,5 @@ kakarot.code-workspace
 coverage/*
 
 # Scripts artifacts
+
+.coverage

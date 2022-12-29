@@ -9,10 +9,10 @@ from starkware.starknet.testing.objects import StarknetCallInfo
 from starkware.crypto.signature.fast_pedersen_hash import pedersen_hash
 
 DEPLOYER_CONTRACT_FILE = os.path.join(
-    os.path.dirname(__file__), "../contracts/deployer.cairo")
+    os.path.dirname(__file__), "../src/deployer.cairo")
 
 ACCOUNT_CONTRACT_FILE = os.path.join(
-    os.path.dirname(__file__), "../contracts/eth_account.cairo")
+    os.path.dirname(__file__), "../src/eth_account.cairo")
 
 tempAccount = web3.eth.Account().create();
 evm_address = web3.Web3().toInt(hexstr=tempAccount.address) 

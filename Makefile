@@ -15,13 +15,13 @@ setup:
 	poetry install --no-root
 
 test:
-	poetry run pytest tests --log-cli-level=INFO -n logical
+	poetry run pytest --log-cli-level=INFO --cov --cov-report=xml ./tests
 
 test-no-log:
-	poetry run pytest tests -n logical
+	poetry run pytest ./tests
 
 run-test-log:
-	poetry run pytest -k $(test) --log-cli-level=INFO -vvv
+	poetry run pytest -k $(test) --log-cli-level=INFO -vvv --cov
 	
 run-test:
 	poetry run pytest -k $(test)
