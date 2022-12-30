@@ -25,8 +25,6 @@ async def test_address_compute():
 
         account_class = await starknet.declare(source=ACCOUNT_CONTRACT_FILE);
 
-        print(account_class.class_hash)
-
         contract = await starknet.deploy(
             source=DEPLOYER_CONTRACT_FILE,
             constructor_calldata=[account_class.class_hash],
@@ -38,7 +36,7 @@ async def test_address_compute():
 
         deployed_account_tx = await contract.create_account(evm_address=evm_address).execute();
 
-        assert computed_contract_address == deployed_account_tx.internal_calls[0].contract_address
+        assert computed_contract_address == deployed_account_tx.call_info.internal_calls[0].contract_address
 
 @pytest.mark.asyncio
 async def test_eth_aa_deployment():
@@ -53,12 +51,12 @@ async def test_eth_aa_deployment():
             constructor_calldata=[account_class.class_hash],
         )
 
-        eth_aa_deploy_tx = (await contract.create_account(evm_address=evm_address).execute());
+        eth_aa_deploy_tx = await contract.create_account(evm_address=evm_address).execute();
 
         eth_aa = StarknetContract(
             starknet.state, 
             get_abi(get_contract_class(source=ACCOUNT_CONTRACT_FILE)), 
-            eth_aa_deploy_tx.internal_calls[0].contract_address, 
+            eth_aa_deploy_tx.call_info.internal_calls[0].contract_address, 
             eth_aa_deploy_tx
         );
 

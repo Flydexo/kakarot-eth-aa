@@ -33,3 +33,4 @@ coverage/*
 # Scripts artifacts
 
 .coverage
+coverage.xml
