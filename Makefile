@@ -3,13 +3,13 @@ cairo_files = $(shell find . -name "*.cairo")
 
 build:
 	$(MAKE) clean
-	poetry run starknet-compile ./src/deployer.cairo --output build/deployer.json --cairo_path ./src --abi build/deployer_abi.json
-	poetry run starknet-compile ./src/eth_account.cairo --account_contract --output build/eth_account.json --cairo_path ./src --abi build/eth_account_abi.json
+	poetry run starknet-compile ./src/kethaa/deployer/deployer.cairo --cairo_path="./src" --output build/deployer.json --cairo_path ./src --abi build/deployer_abi.json
+	poetry run starknet-compile ./src/kethaa/account/account.cairo --cairo_path="./src" --account_contract --output build/account.json --cairo_path ./src --abi build/account_abi.json
 
 build-mac:
 	$(MAKE) clean
-	run starknet-compile ./src/deployer.cairo --output build/deployer.json --cairo_path ./src --abi build/deployer_abi.json
-	run starknet-compile ./src/eth_account.cairo --output build/eth_account.json --cairo_path ./src --abi build/eth_account_abi.json
+	run starknet-compile ./src/kethaa/deployer/deployer.cairo --cairo_path="./src" --output build/deployer.json --cairo_path ./src --abi build/deployer_abi.json
+	run starknet-compile ./src/kethaa/account/account.cairo --cairo_path="./src" --output build/account.json --cairo_path ./src --abi build/account_abi.json
 
 setup:
 	poetry install --no-root
