@@ -17,11 +17,15 @@ ACCOUNT_CONTRACT_FILE = os.path.join(
 tempAccount = web3.eth.Account().create();
 evm_address = web3.Web3().toInt(hexstr=tempAccount.address) 
 
+
+
 @pytest.mark.asyncio
 async def test_address_compute():
         starknet = await Starknet.empty()
 
         account_class = await starknet.declare(source=ACCOUNT_CONTRACT_FILE);
+
+        print(account_class.class_hash)
 
         contract = await starknet.deploy(
             source=DEPLOYER_CONTRACT_FILE,
@@ -34,7 +38,7 @@ async def test_address_compute():
 
         deployed_account_tx = await contract.create_account(evm_address=evm_address).execute();
 
-        assert computed_contract_address == deployed_account_tx.result.account_address
+        assert computed_contract_address == deployed_account_tx.internal_calls[0].contract_address
 
 @pytest.mark.asyncio
 async def test_eth_aa_deployment():
@@ -54,7 +58,7 @@ async def test_eth_aa_deployment():
         eth_aa = StarknetContract(
             starknet.state, 
             get_abi(get_contract_class(source=ACCOUNT_CONTRACT_FILE)), 
-            eth_aa_deploy_tx.result.account_address, 
+            eth_aa_deploy_tx.internal_calls[0].contract_address, 
             eth_aa_deploy_tx
         );
 
@@ -63,4 +67,38 @@ async def test_eth_aa_deployment():
         assert evm_address == output_evm_addres
         
 
-        
+# @pytest.mark.asyncio
+# async def test_eth_aa_signature():
+
+#     starknet = await Starknet.empty()
+
+#     account_class = await starknet.declare(source=ACCOUNT_CONTRACT_FILE);
+
+#     contract = await starknet.deploy(
+#         source=DEPLOYER_CONTRACT_FILE,
+#         constructor_calldata=[account_class.class_hash],
+#     )
+
+#     eth_aa_deploy_tx = (await contract.create_account(evm_address=evm_address).execute());
+
+#     eth_aa = StarknetContract(
+#         starknet.state, 
+#         get_abi(get_contract_class(source=ACCOUNT_CONTRACT_FILE)), 
+#         eth_aa_deploy_tx.internal_calls[0].contract_address, 
+#         eth_aa_deploy_tx
+#     );
+
+
+#     evm_tx = tempAccount.sign_transaction(dict(
+#         nonce=0,
+#         maxFeePerGas=2000000000,
+#         maxPriorityFeePerGas=1000000000,
+#         gas=100000,
+#         to='0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D',
+#         value=0,
+#         data=b'It\'s over 9000!',
+#     ))
+
+#     starknet.state.execute_tx(tx)
+
+#     assert True == False
