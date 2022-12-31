@@ -1,2 +1,2 @@
 ignore:
-    - "tests/integration"
+    - "tests/utils"
