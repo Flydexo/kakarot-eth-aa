@@ -78,10 +78,13 @@ namespace KETHAA {
         let v: felt = signature[0];
         let r: Uint256 = Uint256(low=signature[1], high=signature[2]);
         let s: Uint256 = Uint256(low=signature[3], high=signature[4]);
-        let (h_low, h_high) = split_felt(hash);
-        let tx_hash: Uint256 = Uint256(low=h_low,high=h_high); 
+        let (high, low) = split_felt(hash);
+        let msg_hash: Uint256 = Uint256(low=low, high=high);
+
         with keccak_ptr {
-            verify_eth_signature_uint256(tx_hash, r, s, v, eth_address);
+            verify_eth_signature_uint256(
+                msg_hash=msg_hash, r=r, s=s, v=v, eth_address=eth_address
+            );
         }
         return (is_valid=1);
     }

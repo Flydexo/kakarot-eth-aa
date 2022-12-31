@@ -38,3 +38,8 @@ Read more about:
 # Infrastructure
 
 ![Schema describing how the Account Abstraction will interact with Kakarot](docs/img/infrastructure_1.png)
+
+
+# Setup
+
+Default account seed: 497146928
