@@ -1,23 +1,24 @@
 [tool.poetry]
-name = "kakarot/eth-account-abstraction"
+name = "kethaa"
 version = "0.0.1"
 description = "An Ethereum Account Abstraction on Starknet used to interact with the Kakarot ZKEVM"
-authors = ["Your Name <you@example.com>"]
+authors = ["Flydexo"]
 license = "MIT"
 readme = "README.md"
 packages = [{include = "kakarot"}]
 
 [tool.poetry.dependencies]
-python = "^3.9"
-cairo-lang = "^0.10.1"
+python = ">=3.9,<3.10"
+cairo-lang = "0.10.3"
 openzeppelin-cairo-contracts = "^0.6.0"
 amarna = "^0.1.5"
 
 [tool.poetry.group.dev.dependencies]
 black = "^22.12.0"
 isort = "^5.11.4"
-cairo-coverage = "^0.1.4"
 pytest-cov = "^4.0.0"
+starknet-py = "^0.12.0a0"
+cairo-nile = "^0.12.0"
 
 [build-system]
 requires = ["poetry-core"]
