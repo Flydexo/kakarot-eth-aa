@@ -139,12 +139,13 @@ func is_valid_signature{
     bitwise_ptr: BitwiseBuiltin*,
     range_check_ptr,
 }(
-    hash: felt,
+    hash_len: felt,
+    hash: felt*,
     signature_len: felt,
     signature: felt*
 ) -> (is_valid: felt) {
     alloc_locals;
     let (_eth_address) = eth_address.read();
-    let (is_valid) = KETHAA.is_valid_eth_signature(hash, signature_len, signature, _eth_address);
+    let (is_valid) = KETHAA.is_valid_eth_signature(hash_len, hash, signature_len, signature, _eth_address);
     return (is_valid=is_valid);
 }

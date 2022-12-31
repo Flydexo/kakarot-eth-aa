@@ -1,0 +1,3 @@
+[submodule "herodotus-eth-starknet"]
+	path = src/herodotus-eth-starknet
+	url = https://github.com/HerodotusDev/herodotus-eth-starknet
