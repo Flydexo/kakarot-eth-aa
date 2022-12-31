@@ -1,48 +1,31 @@
 import os
-import pytest
 import web3
-import pytest
-import starknet_py
-from starknet_py.net.gateway_client import GatewayClient
-from starknet_py.net import AccountClient, KeyPair
-from starknet_py.net.models import StarknetChainId
-from starknet_py.contract import Contract
 from eth_account.account import Account, SignedMessage
+from starkware.starknet.testing.starknet import Starknet
+from starkware.starknet.testing.contract import StarknetContract
 from typing import Tuple
 from eth_keys import keys
 
-async def setup(client: GatewayClient, account: Contract, ACCOUNT_CONTRACT_FILE: str, DEPLOYER_CONTRACT_FILE: str) -> Tuple[bytes, Account, int, Contract, Contract] : 
+async def setup_test_env(starknet: Starknet) -> Tuple[StarknetContract, StarknetContract, bytes, int]: 
     private_key = os.urandom(32)
     tempAccount: Account = web3.eth.Account().from_key(private_key)
     evm_address = web3.Web3().toInt(hexstr=tempAccount.address) 
 
-    account_class = await Contract.declare(
-        account=account, compiled_contract=ACCOUNT_CONTRACT_FILE, max_fee=int(1e16)
+    account_class = await starknet.declare(source=os.path.join(os.path.dirname(__file__), "../../src/kethaa/account/account.cairo"), cairo_path=[os.path.join(os.path.dirname(__file__), "../../src")]);
+
+    deployer = await starknet.deploy(
+        source=os.path.join(os.path.dirname(__file__), "../../src/kethaa/deployer/deployer.cairo"), 
+        cairo_path=[os.path.join(os.path.dirname(__file__), "../../src")],
+        constructor_calldata=[account_class.class_hash],
     )
 
-    await account_class.wait_for_acceptance()
+    eth_aa_deploy_tx = await deployer.create_account(evm_address=evm_address).execute();
 
-    deployer_class = await Contract.declare(
-        account=account, compiled_contract=DEPLOYER_CONTRACT_FILE, max_fee=int(1e16)
-    )
+    account = StarknetContract(
+        starknet.state, 
+        account_class.abi,
+        eth_aa_deploy_tx.call_info.internal_calls[0].contract_address, 
+        eth_aa_deploy_tx
+    );
 
-    await deployer_class.wait_for_acceptance()
-
-    deployment = await deployer_class.deploy(constructor_args={account_class.class_hash},max_fee=int(1e16))
-    #
-    await deployment.wait_for_acceptance();
-
-    contract = deployment.deployed_contract
-
-    (computed_contract_address,) = await contract.functions["compute_starknet_address"].call(evm_address)
-
-    invocation = await contract.functions["create_account"].invoke(
-        evm_address=evm_address,
-        max_fee=int(1e16)
-    )
-
-    await invocation.wait_for_acceptance()
-
-    aa_contract = await Contract.from_address(client=client, address=computed_contract_address)
-
-    return private_key,tempAccount, evm_address, contract, aa_contract
+    return deployer, account, private_key, evm_address
