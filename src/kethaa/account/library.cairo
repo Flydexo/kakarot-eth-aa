@@ -76,6 +76,7 @@ namespace KETHAA {
         eth_address: felt,
     ) -> (is_valid:felt) {
         let (tx) = get_tx_info();
+        
         return is_valid_eth_signature(tx.transaction_hash, 1, tx.signature, eth_address);
     }
 
@@ -85,8 +86,8 @@ namespace KETHAA {
         range_check_ptr, 
         bitwise_ptr: BitwiseBuiltin*, 
     }(
-        hash_len: felt,
-        hash: felt*,
+        //hash_len: felt,
+        hash: felt,
         signature_len: felt,
         signature: felt*,
         eth_address: felt,
@@ -96,7 +97,7 @@ namespace KETHAA {
         let r: Uint256 = Uint256(low=signature[1], high=signature[2]);
         let s: Uint256 = Uint256(low=signature[3], high=signature[4]);
         let (high, low) = split_felt(hash);
-        let msg_hash: Uint256 = Uint256(low=hash[0], high=hash[1]);
+        let msg_hash: Uint256 = Uint256(low=low, high=high);
 
         with keccak_ptr {
             verify_eth_signature_uint256(
