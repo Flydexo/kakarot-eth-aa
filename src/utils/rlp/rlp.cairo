@@ -6,7 +6,7 @@ from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.pow import pow
 from starkware.cairo.common.cairo_builtins import HashBuiltin, BitwiseBuiltin
-from starkware.cairo.common.math import split_int
+from starkware.cairo.common.math import unsigned_div_rem
 
 namespace RLP {
   struct Field {
@@ -257,11 +257,7 @@ namespace RLP {
       pedersen_ptr: HashBuiltin*,
       bitwise_ptr: BitwiseBuiltin*,
       range_check_ptr,
-  }(
-    n: felt,
-    bytes_len: felt,
-    bytes: felt*
-  ) -> (blen: felt){
+  }(len: felt) -> (blen: felt){
     // get ready for ugly code
     let fit = is_le(len, 255);
     if(fit == 1) {
@@ -297,6 +293,46 @@ namespace RLP {
     }
   }
 
+  func to_bytes{
+      syscall_ptr: felt*,
+      pedersen_ptr: HashBuiltin*,
+      bitwise_ptr: BitwiseBuiltin*,
+      range_check_ptr,
+  }(
+    bytes: felt*,
+    rs_len: felt,
+    rs: felt*,
+    first: felt,
+  ) -> () {
+    if(rs_len == 0) {
+      return ();
+    }
+    if(first == 1) {
+      let (q,r) = unsigned_div_rem(rs_len, 2);
+      if(r == 0) {
+        [bytes] = [rs];
+        return to_bytes(bytes+1,rs_len-1, rs+1,0);
+      }
+    }
+    [bytes] = [rs]*16 + [rs+1];
+    return to_bytes(bytes+1,rs_len-2, rs+2,0);
+  }
+
+  func to_base_16{
+      syscall_ptr: felt*,
+      pedersen_ptr: HashBuiltin*,
+      bitwise_ptr: BitwiseBuiltin*,
+      range_check_ptr,
+  }(rs_len: felt, rs: felt*, v: felt) -> (rs_len:felt) {
+    let (q, r) = unsigned_div_rem(v, 16);
+    let is_le_16 = is_le(r,16);
+    assert [rs] = r;
+    if(is_le_16 == 1){
+      return (rs_len=rs_len+1);
+    }
+    return to_base_16(rs_len+1, rs+1,q);
+  }
+
   func encode_rlp_list{
       syscall_ptr: felt*,
       pedersen_ptr: HashBuiltin*,
@@ -304,22 +340,25 @@ namespace RLP {
       range_check_ptr,
   }(
     data_len: felt,
-    data: felt*
-  ) -> (rlp_len: felt, rlp: felt*) {
+    data: felt*,
+    rlp: felt*
+  ) -> (rlp_len: felt) {
+    alloc_locals;
     let is_le_55 = is_le(data_len, 55);
     if(is_le_55 == 1) {
-      let (rlp: felt*) = alloc();
       rlp[0] = 0xc0 + data_len;
       fill_array(rlp+1, data_len, data);
-      return (data_len+1, data);
+      return (data_len+1);
     }else{
-      let (rlp: felt*) = alloc();
       let (blen) = bytes_len(data_len); 
       rlp[0] = 0xf7  + blen;
-      let (bytes: felt*) = split_int();
-      fill_array(rlp+1, blen, bytes)
+      let (local rs: felt*) = alloc();
+      let (rs_len) = to_base_16(0, rs, data_len);
+      let (local bytes: felt*) = alloc();
+      to_bytes(bytes, rs_len, rs, 1);
+      fill_array(rlp+1, blen, bytes);
       fill_array(rlp+2, data_len, data);
-      return (data_len+1, data);
+      return (data_len+1);
     }
   }
 }

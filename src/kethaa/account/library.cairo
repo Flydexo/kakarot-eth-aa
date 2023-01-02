@@ -125,37 +125,40 @@ namespace KETHAA {
         RLP.decode_rlp([fields].data_len, [fields].data, fields+RLP.Field.SIZE); // decode fields in array
         let fields = fields+RLP.Field.SIZE; // only fields in the array
         if(tx_type == 2) { 
-            // only eip1559 for the moment
-            let (keccak_ptr: felt*) = alloc();
-            let keccak_ptr_start = keccak_ptr;
-            // tx hash is keccak256(0x02 || rlp([chain_id, nonce, max_priority_fee_per_gas, max_fee_per_gas, gas_limit, destination, amount, data, access_list]))
-            // split into words of 64 bits
-            // change the rlp length because we removed the sig
-            // 1. remove the sig from the data
-            let list_data = [fields].data;
-            
-            let (words: felt*) = alloc();
-            let (words_len: felt) = RLP.bytes_to_words(
-                data_len=calldata_len,
-                data=calldata,
-                words_len=0,
-                words=words
-            );
-            if(fields[V_IDX].data_len == 0) {
-               [ap] = 0,ap++;
-            }else{
-               [ap] = 1,ap++; 
-            }
-            let v = [ap-1];
-            let (high,low) = RLP.bytes_to_uint256(data_len=32, data=fields[R_IDX].data);
-            let r = Uint256(low=low,high=high);
-            let (high,low) = RLP.bytes_to_uint256(data_len=32, data=fields[S_IDX].data);
-            let s = Uint256(low=low,high=high);
-            let (res: Uint256) = keccak{keccak_ptr=keccak_ptr}(inputs=words, n_bytes=calldata_len-67);
-            finalize_keccak(keccak_ptr_start=keccak_ptr_start,keccak_ptr_end=keccak_ptr);
-            return is_valid_eth_signature(res, v, r, s, eth_address);
+            assert 1 = 0;
+            return (is_valid=0);
+            // // only eip1559 for the moment
+            // let (keccak_ptr: felt*) = alloc();
+            // let keccak_ptr_start = keccak_ptr;
+            // // tx hash is keccak256(0x02 || rlp([chain_id, nonce, max_priority_fee_per_gas, max_fee_per_gas, gas_limit, destination, amount, data, access_list]))
+            // // split into words of 64 bits
+            // // change the rlp length because we removed the sig
+            // // 1. remove the sig from the data
+            // let list_data = [fields].data;
+            // let (local rlp: felt*) = alloc();
+            // let (rlp_len: felt) = RLP.encode_rlp_list([fields].data_len-67, list_data, rlp);
+            // let (words: felt*) = alloc();
+            // let (words_len: felt) = RLP.bytes_to_words(
+            //     data_len=calldata_len,
+            //     data=calldata,
+            //     words_len=0,
+            //     words=words
+            // );
+            // if(fields[V_IDX].data_len == 0) {
+            //    [ap] = 0,ap++;
+            // }else{
+            //    [ap] = 1,ap++; 
+            // }
+            // let v = [ap-1];
+            // let (high,low) = RLP.bytes_to_uint256(data_len=32, data=fields[R_IDX].data);
+            // let r = Uint256(low=low,high=high);
+            // let (high,low) = RLP.bytes_to_uint256(data_len=32, data=fields[S_IDX].data);
+            // let s = Uint256(low=low,high=high);
+            // let (res: Uint256) = keccak{keccak_ptr=keccak_ptr}(inputs=words, n_bytes=calldata_len-67);
+            // finalize_keccak(keccak_ptr_start=keccak_ptr_start,keccak_ptr_end=keccak_ptr);
+            // return is_valid_eth_signature(res, v, r, s, eth_address);
         }else{
-            // assert 1 = 0;
+            assert 1 = 0;
             return (is_valid=0);
         }
     }
