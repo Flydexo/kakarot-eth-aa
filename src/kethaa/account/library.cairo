@@ -29,6 +29,22 @@ namespace KETHAA {
         data_len: felt,
     }
 
+    struct EVMTX {
+        type: felt,
+        chain_id: felt,
+        nonce: felt,
+        max_priority_fee_per_gas: felt,
+        max_fee_per_gas: felt,
+        gas_limit: felt,
+        destination: felt,
+        amount: felt,
+        payload_len: felt,
+        payload: felt*,
+        sig_v: felt,
+        r: Uint256*,
+        s: Uint256*,
+    }
+
     // @dev the transaction is considered as valid if: the tx receiver is the Kakarot contract, the function to execute is `execute_at_address`
     // @dev TODO: checks that the user fees in tx < account_balance
     // @dev TODO: checks that starknet tx fees < signed max_fees
@@ -60,6 +76,7 @@ namespace KETHAA {
         eth_address: felt,
     ) -> (is_valid:felt) {
         let (tx) = get_tx_info();
+        
         return is_valid_eth_signature(tx.transaction_hash, 1, tx.signature, eth_address);
     }
 
@@ -69,6 +86,7 @@ namespace KETHAA {
         range_check_ptr, 
         bitwise_ptr: BitwiseBuiltin*, 
     }(
+        //hash_len: felt,
         hash: felt,
         signature_len: felt,
         signature: felt*,
@@ -87,5 +105,16 @@ namespace KETHAA {
             );
         }
         return (is_valid=1);
+    }
+
+    func evm_tx_from_calldata{
+        syscall_ptr: felt*,
+        range_check_ptr, 
+        bitwise_ptr: BitwiseBuiltin*, 
+    }(
+        calldata_len: felt,
+        calldata: felt
+    ) -> () {
+    
     }
 }

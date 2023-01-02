@@ -139,6 +139,8 @@ func is_valid_signature{
     bitwise_ptr: BitwiseBuiltin*,
     range_check_ptr,
 }(
+    //hash_len: felt,
+    //hash: felt*,
     hash: felt,
     signature_len: felt,
     signature: felt*
