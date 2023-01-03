@@ -3,6 +3,7 @@
 %lang starknet
 
 from starkware.cairo.common.math_cmp import is_le
+from starkware.cairo.common.math import assert_le
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.pow import pow
 from starkware.cairo.common.cairo_builtins import HashBuiltin, BitwiseBuiltin
@@ -73,22 +74,57 @@ namespace RLP {
     }
   }
 
-  func read_word{
-       syscall_ptr: felt*,
-       pedersen_ptr: HashBuiltin*,
-       bitwise_ptr: BitwiseBuiltin*,
-       range_check_ptr
-  }(
-    data_len: felt,
-    data: felt*,
-    word: felt
-  ) -> (word:felt) {
-    if(data_len == 0) {
-      return (word=word);
+  func swap_endianness_64{range_check_ptr, bitwise_ptr: BitwiseBuiltin*}(input: felt, size: felt) -> (
+    output: felt
+) {
+    alloc_locals;
+    let (local output: felt*) = alloc();
+
+    // verifies word fits in 64bits
+    assert_le(input, 2 ** 64 - 1);
+
+    // swapped_bytes = ((word & 0xFF00FF00FF00FF00) >> 8) | ((word & 0x00FF00FF00FF00FF) << 8)
+    let (left_part, _) = unsigned_div_rem(input, 256);
+
+    assert bitwise_ptr[0].x = left_part;
+    assert bitwise_ptr[0].y = 0x00FF00FF00FF00FF;
+
+    assert bitwise_ptr[1].x = input * 256;
+    assert bitwise_ptr[1].y = 0xFF00FF00FF00FF00;
+
+    let swapped_bytes = bitwise_ptr[0].x_and_y + bitwise_ptr[1].x_and_y;
+
+    // swapped_2byte_pair = ((swapped_bytes & 0xFFFF0000FFFF0000) >> 16) | ((swapped_bytes & 0x0000FFFF0000FFFF) << 16)
+    let (left_part2, _) = unsigned_div_rem(swapped_bytes, 2 ** 16);
+
+    assert bitwise_ptr[2].x = left_part2;
+    assert bitwise_ptr[2].y = 0x0000FFFF0000FFFF;
+
+    assert bitwise_ptr[3].x = swapped_bytes * 2 ** 16;
+    assert bitwise_ptr[3].y = 0xFFFF0000FFFF0000;
+
+    let swapped_2bytes = bitwise_ptr[2].x_and_y + bitwise_ptr[3].x_and_y;
+
+    // swapped_4byte_pair = (swapped_2byte_pair >> 32) | ((swapped_2byte_pair << 32) % 2**64)
+    let (left_part4, _) = unsigned_div_rem(swapped_2bytes, 2 ** 32);
+
+    assert bitwise_ptr[4].x = swapped_2bytes * 2 ** 32;
+    assert bitwise_ptr[4].y = 0xFFFFFFFF00000000;
+
+    let swapped_4bytes = left_part4 + bitwise_ptr[4].x_and_y;
+
+    let bitwise_ptr = bitwise_ptr + 5 * BitwiseBuiltin.SIZE;
+
+    // Some Shiva-inspired code here
+    let (local shift) = pow(2, ((8 - size) * 8));
+
+    if (size == 8) {
+        return (swapped_4bytes,);
+    } else {
+        let (shifted_4bytes, _) = unsigned_div_rem(swapped_4bytes, shift);
+        return (shifted_4bytes,);
     }
-    let (byte: felt) = read_byte{buffer_ptr=data}();
-    return read_word(data_len=data_len-1,data=data,word=word+byte);
-  }
+}
 
   func bytes_to_words{
        syscall_ptr: felt*,
@@ -101,18 +137,21 @@ namespace RLP {
     words_len: felt,
     words: felt*
   ) -> (words_len:felt) {
+   alloc_locals;
    if(data_len == 0) {
      return (words_len=words_len);
    }
-   let is_le_7 = is_le(data_len, 7);
-   if(is_le_7 == 1) {
-      let (word: felt) = read_word(data_len=8-data_len,data=data,word=0);
-      assert [words] = word;
-      return bytes_to_words(data_len=0,data=data+8-data_len,words_len=words_len+1,words=words+1);
+   let (q, r) = unsigned_div_rem(data_len, 8);
+   if(r != 0) {
+      let (n: felt) = hex_string_to_felt(data_len=r, data=data, n=0);
+      let (output) = swap_endianness_64(n, r);
+      assert [words] = output;
+      return bytes_to_words(data_len=data_len-r,data=data+r,words_len=words_len+1,words=words+1);
    }else{
-      let (word: felt) = read_word(data_len=8,data=data,word=0);
-      assert [words] = word;
-      return bytes_to_words(data_len=data_len-8,data=data+64,words_len=words_len+1,words=words+1);     
+      let (n: felt) = hex_string_to_felt(data_len=8,data=data,n=0);
+      let (output) = swap_endianness_64(n, 8);
+      assert [words] = output;
+      return bytes_to_words(data_len=data_len-8,data=data+8,words_len=words_len+1,words=words+1);     
    }
   }
 
@@ -126,10 +165,10 @@ namespace RLP {
     data: felt*,
   ) -> (high: felt, low: felt) {
    alloc_locals;
-   let (word: felt) = read_word(data_len=16,data=data,word=0);
-   local high = word;
-   let (word: felt) = read_word(data_len=16,data=data+16,word=0);
-   local low = word;
+   let (n: felt) = hex_string_to_felt(data_len=16,data=data,n=0);
+   local high = n;
+   let (n: felt) = hex_string_to_felt(data_len=16,data=data+16,n=0);
+   local low = n;
    return (high=high, low=low);
   }
 
@@ -201,7 +240,8 @@ namespace RLP {
         let is_le_191 = is_le(byte,191); // string longer than 55 bytes
         if (is_le_191 == 1) {
             local len_len = byte - 183;
-            let (dlen) = get_data_len(len=0,len_len=len_len);
+            let (dlen) = hex_string_to_felt(data_len=len_len,data=buffer_ptr,n=0);
+            let buffer_ptr = buffer_ptr + len_len;
             assert [fields] = Field(
               data_len=dlen,
               data=buffer_ptr,
@@ -222,7 +262,8 @@ namespace RLP {
         let is_le_255 = is_le(byte, 255); // list > 55 bytes
         if(is_le_255 == 1) {
             local list_len_len = byte - 247;
-            let (dlen) = get_data_len(len=0,len_len=list_len_len);
+            let (dlen) = hex_string_to_felt(data_len=list_len_len,data=buffer_ptr,n=0);
+            let buffer_ptr = buffer_ptr + list_len_len;
             assert [fields] = Field(
                 data_len=dlen,
                 data=buffer_ptr,
@@ -248,7 +289,7 @@ namespace RLP {
       return ();
     }
 
-    [recipient] = [data];
+    assert [recipient] = [data];
     return fill_array(recipient+1, data_len-1, data+1);
   }
 
@@ -257,7 +298,7 @@ namespace RLP {
       pedersen_ptr: HashBuiltin*,
       bitwise_ptr: BitwiseBuiltin*,
       range_check_ptr,
-  }(len: felt) -> (blen: felt){
+  }(len: felt) -> (byte_len: felt){
     // get ready for ugly code
     let fit = is_le(len, 255);
     if(fit == 1) {
@@ -291,6 +332,7 @@ namespace RLP {
     if(fit == 1) {
       return (byte_len=8);
     }
+    return (byte_len=0);
   }
 
   func to_bytes{
@@ -308,15 +350,19 @@ namespace RLP {
       return ();
     }
     if(first == 1) {
-      let (q,r) = unsigned_div_rem(rs_len, 2);
-      if(r == 0) {
-        [bytes] = [rs];
-        return to_bytes(bytes+1,rs_len-1, rs+1,0);
-      }
+     let (q,r) = unsigned_div_rem(rs_len, 2);
+     if(r == 0) {
+       assert [bytes] = [rs];
+       return to_bytes(bytes+1,rs_len-1, rs+1,0);
+     }else{
+         assert [bytes] = [rs]*16 + [rs+1];
+         return to_bytes(bytes+1,rs_len-2, rs+2,0);
+     }
+    }else{
+        assert [bytes] = [rs]*16 + [rs+1];
+        return to_bytes(bytes+1,rs_len-2, rs+2,0);
     }
-    [bytes] = [rs]*16 + [rs+1];
-    return to_bytes(bytes+1,rs_len-2, rs+2,0);
-  }
+}
 
   func to_base_16{
       syscall_ptr: felt*,
@@ -346,19 +392,19 @@ namespace RLP {
     alloc_locals;
     let is_le_55 = is_le(data_len, 55);
     if(is_le_55 == 1) {
-      rlp[0] = 0xc0 + data_len;
+      assert rlp[0] = 0xc0 + data_len;
       fill_array(rlp+1, data_len, data);
-      return (data_len+1);
+      return (rlp_len=data_len+1);
     }else{
-      let (blen) = bytes_len(data_len); 
-      rlp[0] = 0xf7  + blen;
+      let (byte_len) = bytes_len(data_len); 
+      assert rlp[0] = 0xf7  + byte_len;
       let (local rs: felt*) = alloc();
       let (rs_len) = to_base_16(0, rs, data_len);
       let (local bytes: felt*) = alloc();
       to_bytes(bytes, rs_len, rs, 1);
-      fill_array(rlp+1, blen, bytes);
+      fill_array(rlp+1, byte_len, bytes);
       fill_array(rlp+2, data_len, data);
-      return (data_len+1);
+      return (rlp_len=data_len+1);
     }
   }
 }

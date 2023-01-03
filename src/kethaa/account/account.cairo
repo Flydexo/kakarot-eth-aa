@@ -153,3 +153,17 @@ func is_valid_signature{
     let (is_valid) = KETHAA.is_valid_eth_signature(msg_hash, v, r, s, _eth_address);
     return (is_valid=is_valid);
 }
+
+@view 
+func get_tx_hash{
+    syscall_ptr: felt*,
+    pedersen_ptr: HashBuiltin*,
+    bitwise_ptr: BitwiseBuiltin*,
+    range_check_ptr,
+}(
+    raw_tx_len: felt,
+    raw_tx: felt*
+) -> (hash: Uint256) {
+    let (hash) = KETHAA.get_tx_hash(raw_tx_len, raw_tx);
+    return (hash=hash);
+}
