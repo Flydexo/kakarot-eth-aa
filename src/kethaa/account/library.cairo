@@ -17,6 +17,8 @@ namespace KETHAA {
     const AA_VERSION = 0x11F2231B9D464344B81D536A50553D6281A9FA0FA37EF9AC2B9E076729AEFAA;  // pedersen("KAKAROT_AA_V0.0.1")
     const TX_FIELDS = 12;  // number of elements in an evm tx see EIP 1559
 
+    // Indexes to retrieve specific data from the EVM transaction
+    // @dev Should be used (eg: `fields[CHAIN_ID_IDX]`)
     const CHAIN_ID_IDX = 0;
     const NONCE_IDX = 1;
     const MAX_PRIORITY_FEE_PER_GAS_IDX = 2;
@@ -30,7 +32,7 @@ namespace KETHAA {
     const R_IDX = 10;
     const S_IDX = 11;
 
-    // 2 * len_byte + 2 * string_len (32) + v
+    //@dev 2 * len_byte + 2 * string_len (32) + v
     const SIGNATURE_LEN = 67;
 
     struct Call {
@@ -48,26 +50,8 @@ namespace KETHAA {
         data_len: felt,
     }
 
-    struct EVMTX {
-        type: felt,
-        chain_id: felt,
-        nonce: felt,
-        max_priority_fee_per_gas: felt,
-        max_fee_per_gas: felt,
-        gas_limit: felt,
-        destination: felt,
-        amount: felt,
-        payload_len: felt,
-        payload: felt*,
-        sig_v: felt,
-        r: Uint256*,
-        s: Uint256*,
-    }
-
     // @dev the transaction is considered as valid if: the tx receiver is the Kakarot contract, the function to execute is `execute_at_address`
-    // @dev TODO: checks that the user fees in tx < account_balance
-    // @dev TODO: checks that starknet tx fees < signed max_fees
-    // @dev TODO: checks that tx.value < account_balance - fees
+    // @dev TODO https://github.com/Flydexo/kakarot-eth-aa/issues/12
     func is_valid_kakarot_transaction{
         syscall_ptr: felt*,
         pedersen_ptr: HashBuiltin*,
@@ -82,6 +66,12 @@ namespace KETHAA {
         }
     }
 
+    // @notice checks if tx is signed and valid for each call
+    // @param eth_address The ethereum address owning this account
+    // @param call_array_len The length of the call array
+    // @param call_array The call array
+    // @param calldata_len The length of the calldata
+    // @param calldata The calldata
     func are_valid_calls{
         syscall_ptr: felt*,
         pedersen_ptr: HashBuiltin*,
@@ -118,12 +108,26 @@ namespace KETHAA {
         );
     }
 
+    // @notice decodes evm tx and validates it
+    // @dev 1. decodes the tx list
+    // @dev 2. recodes the list without the signature
+    // @dev 3. hashes the tx
+    // @dev 4. verifies the signature
+    // @dev TODO https://github.com/Flydexo/kakarot-eth-aa/issues/6
+    // @param eth_address The ethereum address owning the account
+    // @param calldata_len The lenght of the calldata
+    // @param calldata The calldata
+    // @return is_valid 1 if the transaction is valid
     func is_valid_eth_tx{
         syscall_ptr: felt*,
         pedersen_ptr: HashBuiltin*,
         bitwise_ptr: BitwiseBuiltin*,
         range_check_ptr,
-    }(eth_address: felt, calldata_len: felt, calldata: felt*) -> (is_valid: felt) {
+    }(
+        eth_address: felt, 
+        calldata_len: felt, 
+        calldata: felt*
+    ) -> (is_valid: felt) {
         alloc_locals;
         let tx_type = [calldata];
         let rlp_data = calldata + 1;  // remove the tx type
@@ -147,11 +151,8 @@ namespace KETHAA {
             );
             // hash the transaction
             let (res: Uint256) = keccak{keccak_ptr=keccak_ptr}(inputs=words, n_bytes=rlp_len + 1);
-            // call this function to make the hash function soudness
-            // finalize_keccak(keccak_ptr_start=keccak_ptr_start,keccak_ptr_end=keccak_ptr);
             let (sub_fields: RLP.Field*) = alloc();
             RLP.decode_rlp([fields].data_len, [fields].data, sub_fields);
-            // let (n) = RLP.hex_string_to_felt(sub_fields[V_IDX].data_len, sub_fields[V_IDX].data, 0);
             if (sub_fields[V_IDX].data_len == 0) {
                 [ap] = 0, ap++;
             } else {
@@ -162,6 +163,8 @@ namespace KETHAA {
             let r = Uint256(low=low, high=high);
             let (high, low) = RLP.bytes_to_uint256(data_len=32, data=sub_fields[S_IDX].data);
             let s = Uint256(low=low, high=high);
+            // call this function to make the hash function soudness
+            finalize_keccak(keccak_ptr_start=keccak_ptr_start,keccak_ptr_end=keccak_ptr);
             return is_valid_eth_signature(res, v, r, s, eth_address);
         } else {
             assert 1 = 0;
@@ -169,12 +172,23 @@ namespace KETHAA {
         }
     }
 
+    // @notice returns 1 (true) and does not fail if the signature is valid
+    // @param hash The Hash to verify if signed
+    // @param v, r, s The signature
+    // @param eth_address The ethereum address to compare the signature
+    // @return is_valid 1 if the signature is valid
     func is_valid_eth_signature{
         syscall_ptr: felt*,
         pedersen_ptr: HashBuiltin*,
         bitwise_ptr: BitwiseBuiltin*,
         range_check_ptr,
-    }(hash: Uint256, v: felt, r: Uint256, s: Uint256, eth_address: felt) -> (is_valid: felt) {
+    }(
+        hash: Uint256, 
+        v: felt, 
+        r: Uint256, 
+        s: Uint256, 
+        eth_address: felt
+    ) -> (is_valid: felt) {
         let (keccak_ptr: felt*) = alloc();
 
         with keccak_ptr {
@@ -183,19 +197,29 @@ namespace KETHAA {
         return (is_valid=1);
     }
 
+    // @notice temporary
+    // @dev returns the hash of the transaction provided in the calldata
+    // @dev calldata_len The lenght of the calldata
+    // @dev calldata The calldata
+    // @return hash The transaction hash
     func get_tx_hash{
         syscall_ptr: felt*,
         pedersen_ptr: HashBuiltin*,
         bitwise_ptr: BitwiseBuiltin*,
         range_check_ptr,
-    }(calldata_len: felt, calldata: felt*) -> (hash: Uint256) {
+    }(
+        calldata_len: felt, 
+        calldata: felt*
+    ) -> (hash: Uint256) {
         alloc_locals;
-            let (words: felt*) = alloc();
-            let (words_len: felt) = RLP.bytes_to_words(
-                data_len=calldata_len, data=calldata, words_len=0, words=words
-            );
-            let (res: Uint256) = keccak{keccak_ptr=keccak_ptr}(inputs=words, n_bytes=calldata_len);
-            finalize_keccak(keccak_ptr_start=keccak_ptr_start, keccak_ptr_end=keccak_ptr);
-            return (hash=res);
+        let (keccak_ptr: felt*) = alloc();
+        let keccak_ptr_start = keccak_ptr;
+        let (words: felt*) = alloc();
+        let (words_len: felt) = RLP.bytes_to_words(
+            data_len=calldata_len, data=calldata, words_len=0, words=words
+        );
+        let (res: Uint256) = keccak{keccak_ptr=keccak_ptr}(inputs=words, n_bytes=calldata_len);
+        finalize_keccak(keccak_ptr_start=keccak_ptr_start, keccak_ptr_end=keccak_ptr);
+        return (hash=res);
     }
 }

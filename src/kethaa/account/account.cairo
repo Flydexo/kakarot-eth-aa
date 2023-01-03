@@ -11,8 +11,9 @@ from starkware.starknet.common.eth_utils import assert_eth_address_range
 from starkware.cairo.common.math_cmp import is_le_felt
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.cairo_secp.signature import verify_eth_signature_uint256
-from kethaa.account.library import KETHAA
 from starkware.cairo.common.uint256 import Uint256
+// Account library
+from kethaa.account.library import KETHAA
 
 @storage_var
 func eth_address() -> (adress: felt) {
@@ -129,7 +130,8 @@ func supports_interface{
 
 // @notice checks if the signature is valid
 // @dev returns true if the signature is signed by the account controller
-// @param hash The hash which was signed
+// @param hash_len The hash length which was signed
+// @param hash The hash [low_128_bits, high_128_bits]
 // @param signature_len The length of the signature array
 // @param signature The array of the ethereum signature (as v, r, s)
 @view
@@ -154,6 +156,11 @@ func is_valid_signature{
     return (is_valid=is_valid);
 }
 
+// @notice temporary
+// @dev used to debug the hashing algorithm used to hash a transaction
+// @param raw_tx_len the lenth of the raw transaction (in bytes)
+// @param raw_tx the raw transaction (each item in array is a byte)
+// @return hash The calculated hash (uin256)
 @view 
 func get_tx_hash{
     syscall_ptr: felt*,
