@@ -20,12 +20,38 @@ namespace RLP {
     is_list: felt, // when is TRUE the data must be RLP decoded
   }
 
-  // @notice transform muliple bytes into a single felt
+  // @notice transform muliple bytes into a single felt as big endian
   // @param data_len The lenght of the bytes
   // @param data The pointer to the bytes array
   // @param n used for recursion, set to 0
   // @return n the resultant felt
-  func bytes_to_felt{
+  func bytes_to_felt_big{
+      syscall_ptr: felt*,
+      pedersen_ptr: HashBuiltin*,
+      bitwise_ptr: BitwiseBuiltin*,
+      range_check_ptr,
+  }(
+    data_len: felt,
+    data: felt*,
+    n: felt
+  ) -> (n:felt) {
+    if(data_len == 0) {
+      return (n=n);
+    }
+    let e: felt = data_len - 1;
+    let byte: felt = [data];
+    let (res) = pow(256, e);
+    return bytes_to_felt_big(data_len=data_len-1,data=data+1,n=n+byte*res);
+  }
+
+
+
+  // @notice transform muliple bytes into a single felt as little endian
+  // @param data_len The lenght of the bytes
+  // @param data The pointer to the bytes array
+  // @param n used for recursion, set to 0
+  // @return n the resultant felt
+  func bytes_to_felt_little{
       syscall_ptr: felt*,
       pedersen_ptr: HashBuiltin*,
       bitwise_ptr: BitwiseBuiltin*,
@@ -41,7 +67,7 @@ namespace RLP {
     let e: felt = data_len - 1;
     let byte: felt = data[data_len-1];
     let (res) = pow(256, e);
-    return bytes_to_felt(data_len=data_len-1,data=data,n=n+byte*res);
+    return bytes_to_felt_little(data_len=data_len-1,data=data,n=n+byte*res);
   }
 
   // @notice transforms a sequence of bytes to groups of 64 bits (little endian)
@@ -67,11 +93,11 @@ namespace RLP {
    }
    let is_le_7 = is_le(data_len, 7);
    if(is_le_7 == 1) {
-      let (n: felt) = bytes_to_felt(data_len=data_len, data=data, n=0);
+      let (n: felt) = bytes_to_felt_little(data_len=data_len, data=data, n=0);
       assert [words] = n;
       return bytes_to_words(data_len=0,data=data+data_len,words_len=words_len+1,words=words+1);
    }else{
-      let (n: felt) = bytes_to_felt(data_len=8,data=data,n=0);
+      let (n: felt) = bytes_to_felt_little(data_len=8,data=data,n=0);
       assert [words] = n;
       return bytes_to_words(data_len=data_len-8,data=data+8,words_len=words_len+1,words=words+1);     
    }
@@ -92,9 +118,10 @@ namespace RLP {
     data: felt*,
   ) -> (high: felt, low: felt) {
    alloc_locals;
-   let (n: felt) = bytes_to_felt(data_len=16,data=data,n=0);
+   let (n: felt) = bytes_to_felt_big(data_len=16,data=data,n=0);
+   let res = word_reverse_endian(n);
    local high = n;
-   let (n: felt) = bytes_to_felt(data_len=16,data=data+16,n=0);
+   let (n: felt) = bytes_to_felt_big(data_len=16,data=data+16,n=0);
    local low = n;
    return (high=high, low=low);
   }
@@ -157,7 +184,7 @@ namespace RLP {
         let is_le_191 = is_le(byte,191); // string longer than 55 bytes
         if (is_le_191 == 1) {
             local len_len = byte - 183;
-            let (dlen) = bytes_to_felt(data_len=len_len,data=buffer_ptr,n=0);
+            let (dlen) = bytes_to_felt_little(data_len=len_len,data=buffer_ptr,n=0);
             let buffer_ptr = buffer_ptr + len_len;
             assert [fields] = Field(
               data_len=dlen,
@@ -179,7 +206,7 @@ namespace RLP {
         let is_le_255 = is_le(byte, 255); // list > 55 bytes
         if(is_le_255 == 1) {
             local list_len_len = byte - 247;
-            let (dlen) = bytes_to_felt(data_len=list_len_len,data=buffer_ptr,n=0);
+            let (dlen) = bytes_to_felt_little(data_len=list_len_len,data=buffer_ptr,n=0);
             let buffer_ptr = buffer_ptr + list_len_len;
             assert [fields] = Field(
                 data_len=dlen,
