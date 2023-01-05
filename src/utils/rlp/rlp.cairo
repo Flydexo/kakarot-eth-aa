@@ -8,6 +8,7 @@ from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.pow import pow
 from starkware.cairo.common.cairo_builtins import HashBuiltin, BitwiseBuiltin
 from starkware.cairo.common.math import unsigned_div_rem
+from starkware.cairo.common.uint256 import word_reverse_endian
 
 // The namespace handling all RLP computation
 namespace RLP {
@@ -38,63 +39,9 @@ namespace RLP {
       return (n=n);
     }
     let e: felt = data_len - 1;
-    let byte: felt = [data];
+    let byte: felt = data[data_len-1];
     let (res) = pow(256, e);
-    return bytes_to_felt(data_len=data_len-1,data=data+1,n=n+byte*res);
-  }
-
-
-  // @dev see https://github.com/HerodotusDev/herodotus-eth-starknet/blob/6929d0cc4f56d0ee4cc039dde1ed33f7fea6afb3/lib/swap_endianness.cairo#L70
-  func swap_endianness_64{range_check_ptr, bitwise_ptr: BitwiseBuiltin*}(input: felt, size: felt) -> (
-    output: felt
-  ) {
-      alloc_locals;
-      let (local output: felt*) = alloc();
-
-      // verifies word fits in 64bits
-      assert_le(input, 2 ** 64 - 1);
-
-      // swapped_bytes = ((word & 0xFF00FF00FF00FF00) >> 8) | ((word & 0x00FF00FF00FF00FF) << 8)
-      let (left_part, _) = unsigned_div_rem(input, 256);
-
-      assert bitwise_ptr[0].x = left_part;
-      assert bitwise_ptr[0].y = 0x00FF00FF00FF00FF;
-
-      assert bitwise_ptr[1].x = input * 256;
-      assert bitwise_ptr[1].y = 0xFF00FF00FF00FF00;
-
-      let swapped_bytes = bitwise_ptr[0].x_and_y + bitwise_ptr[1].x_and_y;
-
-      // swapped_2byte_pair = ((swapped_bytes & 0xFFFF0000FFFF0000) >> 16) | ((swapped_bytes & 0x0000FFFF0000FFFF) << 16)
-      let (left_part2, _) = unsigned_div_rem(swapped_bytes, 2 ** 16);
-
-      assert bitwise_ptr[2].x = left_part2;
-      assert bitwise_ptr[2].y = 0x0000FFFF0000FFFF;
-
-      assert bitwise_ptr[3].x = swapped_bytes * 2 ** 16;
-      assert bitwise_ptr[3].y = 0xFFFF0000FFFF0000;
-
-      let swapped_2bytes = bitwise_ptr[2].x_and_y + bitwise_ptr[3].x_and_y;
-
-      // swapped_4byte_pair = (swapped_2byte_pair >> 32) | ((swapped_2byte_pair << 32) % 2**64)
-      let (left_part4, _) = unsigned_div_rem(swapped_2bytes, 2 ** 32);
-
-      assert bitwise_ptr[4].x = swapped_2bytes * 2 ** 32;
-      assert bitwise_ptr[4].y = 0xFFFFFFFF00000000;
-
-      let swapped_4bytes = left_part4 + bitwise_ptr[4].x_and_y;
-
-      let bitwise_ptr = bitwise_ptr + 5 * BitwiseBuiltin.SIZE;
-
-      // Some Shiva-inspired code here
-      let (local shift) = pow(2, ((8 - size) * 8));
-
-      if (size == 8) {
-          return (swapped_4bytes,);
-      } else {
-          let (shifted_4bytes, _) = unsigned_div_rem(swapped_4bytes, shift);
-          return (shifted_4bytes,);
-      }
+    return bytes_to_felt(data_len=data_len-1,data=data,n=n+byte*res);
   }
 
   // @notice transforms a sequence of bytes to groups of 64 bits (little endian)
@@ -118,16 +65,14 @@ namespace RLP {
    if(data_len == 0) {
      return (words_len=words_len);
    }
-   let (q, r) = unsigned_div_rem(data_len, 8);
-   if(r != 0) {
-      let (n: felt) = bytes_to_felt(data_len=r, data=data, n=0);
-      let (output) = swap_endianness_64(n, r);
-      assert [words] = output;
-      return bytes_to_words(data_len=data_len-r,data=data+r,words_len=words_len+1,words=words+1);
+   let is_le_7 = is_le(data_len, 7);
+   if(is_le_7 == 1) {
+      let (n: felt) = bytes_to_felt(data_len=data_len, data=data, n=0);
+      assert [words] = n;
+      return bytes_to_words(data_len=0,data=data+data_len,words_len=words_len+1,words=words+1);
    }else{
       let (n: felt) = bytes_to_felt(data_len=8,data=data,n=0);
-      let (output) = swap_endianness_64(n, 8);
-      assert [words] = output;
+      assert [words] = n;
       return bytes_to_words(data_len=data_len-8,data=data+8,words_len=words_len+1,words=words+1);     
    }
   }
@@ -314,8 +259,16 @@ namespace RLP {
     return (byte_len=0);
   }
 
-  // @dev TODO: fix endianness
+  // @dev returns an array representing the value by the remainders of the 16 division
+  // @dev example: 1000 => [8, 14, 3]
+  // @param rs_len Used for recursion, set to 0
+  // @param rs Pointer to the array that will receive the remainders
+  // @param v The initial value
+  // @return rs_len The final length of the remainders array
   func to_base_16{
+      syscall_ptr: felt*,
+      pedersen_ptr: HashBuiltin*,
+      bitwise_ptr: BitwiseBuiltin*,
       range_check_ptr,
   }(rs_len: felt, rs: felt*, v: felt) -> (rs_len:felt) {
     let (q, r) = unsigned_div_rem(v, 16);
@@ -328,10 +281,13 @@ namespace RLP {
     }
     return to_base_16(rs_len+1, rs+1,q);
   }
-  
-  // @dev TODO: fix endianness
- func to_bytes{
-      range_check_ptr,
+
+  // @dev TODO: fix endian
+  func to_bytes{
+     syscall_ptr: felt*,
+     pedersen_ptr: HashBuiltin*,
+     bitwise_ptr: BitwiseBuiltin*,
+     range_check_ptr,
   }(
     bytes: felt*,
     rs_len: felt,
@@ -340,16 +296,18 @@ namespace RLP {
     if(rs_len == 0) {
       return ();
     }
-     if(rs_len != 1) {
-       assert [bytes] = [rs] + [rs+1]*16;
-       return to_bytes(bytes+1,rs_len-2, rs+2);
-     }else{
-         assert [bytes] = [rs];
-         return to_bytes(bytes+1,rs_len-1, rs+1);
-     }
+    let (q, r) = unsigned_div_rem(rs_len, 2);
+    if(r == 0){
+        assert [bytes] = rs[rs_len-1]*16 + rs[rs_len-2];
+        return to_bytes(bytes, rs_len-2, rs);
+    }else{
+        assert [bytes] = rs[rs_len-1];
+        return to_bytes(bytes, rs_len-1,rs);
+    }
 }
 
-// @dev TODO: fix endianness
+
+  // @dev TODO: fix endian
   func encode_rlp_list{
       syscall_ptr: felt*,
       pedersen_ptr: HashBuiltin*,
@@ -374,7 +332,7 @@ namespace RLP {
       let (local bytes: felt*) = alloc();
       to_bytes(bytes, rs_len, rs);
       fill_array(rlp+1, byte_len, bytes);
-      fill_array(rlp+2, data_len, data);
+      fill_array(rlp+1+byte_len, data_len, data);
       return (rlp_len=data_len+1);
     }
   }
