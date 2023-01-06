@@ -152,7 +152,7 @@ func is_valid_signature{
     let r: Uint256 = Uint256(low=signature[1], high=signature[2]);
     let s: Uint256 = Uint256(low=signature[3], high=signature[4]);
     let msg_hash: Uint256 = Uint256(low=hash[0], high=hash[1]);
-    let (is_valid) = KETHAA.is_valid_eth_signature(msg_hash, v, r, s, _eth_address);
+    let (is_valid) = KETHAA.is_valid_eth_signature(msg_hash, r, s,v, _eth_address);
     return (is_valid=is_valid);
 }
 
@@ -173,4 +173,32 @@ func get_tx_hash{
 ) -> (hash: Uint256) {
     let (hash) = KETHAA.get_tx_hash(raw_tx_len, raw_tx);
     return (hash=hash);
+}
+
+@view 
+func get_data_hash{
+    syscall_ptr: felt*,
+    pedersen_ptr: HashBuiltin*,
+    bitwise_ptr: BitwiseBuiltin*,
+    range_check_ptr,
+}(
+    raw_tx_len: felt,
+    raw_tx: felt*
+) -> (hash: Uint256) {
+    let (hash) = KETHAA.get_data_hash(raw_tx_len, raw_tx);
+    return (hash=hash);
+}
+
+@view 
+func get_tx_sig{
+    syscall_ptr: felt*,
+    pedersen_ptr: HashBuiltin*,
+    bitwise_ptr: BitwiseBuiltin*,
+    range_check_ptr,
+}(
+    raw_tx_len: felt,
+    raw_tx: felt*
+) -> (v: felt, s: Uint256, r: Uint256) {
+    let r = KETHAA.get_tx_sig(raw_tx_len, raw_tx);
+    return r;
 }

@@ -2,6 +2,7 @@
 
 %lang starknet
 
+from starkware.cairo.common.uint256 import Uint256
 from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.math import assert_le
 from starkware.cairo.common.alloc import alloc
@@ -42,6 +43,25 @@ namespace RLP {
     let byte: felt = data[data_len-1];
     let (res) = pow(256, e);
     return bytes_to_felt(data_len=data_len-1,data=data,n=n+byte*res);
+  }
+
+  func bytes_to_felt_big{
+      syscall_ptr: felt*,
+      pedersen_ptr: HashBuiltin*,
+      bitwise_ptr: BitwiseBuiltin*,
+      range_check_ptr,
+  }(
+    data_len: felt,
+    data: felt*,
+    n: felt
+  ) -> (n:felt) {
+    if(data_len == 0) {
+      return (n=n);
+    }
+    let e: felt = data_len - 1;
+    let byte: felt = data[0];
+    let (res) = pow(256, e);
+    return bytes_to_felt_big(data_len=data_len-1,data=data+1,n=n+byte*res);
   }
 
   // @notice transforms a sequence of bytes to groups of 64 bits (little endian)
@@ -90,13 +110,13 @@ namespace RLP {
   }(
     data_len: felt,
     data: felt*,
-  ) -> (high: felt, low: felt) {
+  ) -> (res: Uint256) {
    alloc_locals;
-   let (n: felt) = bytes_to_felt(data_len=16,data=data,n=0);
-   local high = n;
-   let (n: felt) = bytes_to_felt(data_len=16,data=data+16,n=0);
+   let (n: felt) = bytes_to_felt_big(data_len=16,data=data,n=0);
    local low = n;
-   return (high=high, low=low);
+   let (n: felt) = bytes_to_felt_big(data_len=16,data=data+16,n=0);
+   local high = n;
+   return (res=Uint256(low=low,high=high));
   }
 
   // @notice reads the next byte in the buffer_ptr and increments it
@@ -138,8 +158,8 @@ namespace RLP {
         let is_le_127: felt = is_le(byte, 127);
         if(is_le_127 == 1) {
             assert [fields] = Field(
-              data_len=0,
-              data=buffer_ptr,
+              data_len=1,
+              data=buffer_ptr-1,
               is_list=0
             );
             return decode_rlp(data_len=data_len-1,data=buffer_ptr, fields=fields + Field.SIZE);

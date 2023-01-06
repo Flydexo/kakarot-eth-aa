@@ -134,38 +134,25 @@ namespace KETHAA {
         let (local fields: RLP.Field*) = alloc();
         RLP.decode_rlp(calldata_len - 1, rlp_data, fields);  // decode array
         if (tx_type == 2) {
-            // only eip1559 for the moment
-            // tx hash is keccak256(0x02 || rlp([chain_id, nonce, max_priority_fee_per_gas, max_fee_per_gas, gas_limit, destination, amount, data, access_list]))
-            // remove the signature from the array
             let data_len: felt = [fields].data_len - SIGNATURE_LEN;
-            // recreate the list rlp encoded
             let (list_ptr: felt*) = alloc();
             assert [list_ptr] = tx_type;
             let (rlp_len: felt) = RLP.encode_rlp_list(data_len, [fields].data, list_ptr + 1);
             let (keccak_ptr: felt*) = alloc();
             let keccak_ptr_start = keccak_ptr;
-            // split into words of 64 bits
             let (words: felt*) = alloc();
             let (words_len: felt) = RLP.bytes_to_words(
                 data_len=rlp_len + 1, data=list_ptr, words_len=0, words=words
             );
-            // hash the transaction
-            let (res: Uint256) = keccak{keccak_ptr=keccak_ptr}(inputs=words, n_bytes=rlp_len + 1);
-            let (sub_fields: RLP.Field*) = alloc();
+            let tx_hash = keccak{keccak_ptr=keccak_ptr}(inputs=words, n_bytes=rlp_len + 1);
+            let (local sub_fields: RLP.Field*) = alloc();
             RLP.decode_rlp([fields].data_len, [fields].data, sub_fields);
-            if (sub_fields[V_IDX].data_len == 0) {
-                [ap] = 0, ap++;
-            } else {
-                [ap] = 1, ap++;
-            }
-            let v = [ap - 1];
-            let (high, low) = RLP.bytes_to_uint256(data_len=32, data=sub_fields[R_IDX].data);
-            let r = Uint256(low=low, high=high);
-            let (high, low) = RLP.bytes_to_uint256(data_len=32, data=sub_fields[S_IDX].data);
-            let s = Uint256(low=low, high=high);
-            // call this function to make the hash function soudness
+            let v = RLP.bytes_to_felt(sub_fields[V_IDX].data_len, sub_fields[V_IDX].data, 0);
+            let r = RLP.bytes_to_uint256(data_len=32, data=sub_fields[R_IDX].data);
+            let s = RLP.bytes_to_uint256(data_len=32, data=sub_fields[S_IDX].data);
+            verify_eth_signature_uint256{keccak_ptr=keccak_ptr}(msg_hash=tx_hash.res, r=r.res, s=s.res, v=v.n, eth_address=eth_address);
             finalize_keccak(keccak_ptr_start=keccak_ptr_start,keccak_ptr_end=keccak_ptr);
-            return is_valid_eth_signature(res, v, r, s, eth_address);
+            return (is_valid=1);
         } else {
             assert 1 = 0;
             return (is_valid=0);
@@ -183,25 +170,43 @@ namespace KETHAA {
         bitwise_ptr: BitwiseBuiltin*,
         range_check_ptr,
     }(
-        hash: Uint256, 
-        v: felt, 
-        r: Uint256, 
-        s: Uint256, 
-        eth_address: felt
+      msg_hash: Uint256,
+      r: Uint256,
+      s: Uint256,
+      v: felt,
+      eth_address: felt
     ) -> (is_valid: felt) {
         let (keccak_ptr: felt*) = alloc();
 
         with keccak_ptr {
-            verify_eth_signature_uint256(msg_hash=hash, r=r, s=s, v=v, eth_address=eth_address);
+            verify_eth_signature_uint256(msg_hash=msg_hash, r=r, s=s, v=v, eth_address=eth_address);
         }
         return (is_valid=1);
     }
 
     // @notice temporary
-    // @dev returns the hash of the transaction provided in the calldata
-    // @dev calldata_len The lenght of the calldata
-    // @dev calldata The calldata
-    // @return hash The transaction hash
+    func get_data_hash{
+        syscall_ptr: felt*,
+        pedersen_ptr: HashBuiltin*,
+        bitwise_ptr: BitwiseBuiltin*,
+        range_check_ptr,
+    }(
+        calldata_len: felt, 
+        calldata: felt*
+    ) -> (hash: Uint256) {
+      alloc_locals;
+        let (keccak_ptr: felt*) = alloc();
+        let keccak_ptr_start = keccak_ptr;
+        let (words: felt*) = alloc();
+        let (words_len: felt) = RLP.bytes_to_words(
+            data_len=calldata_len, data=calldata, words_len=0, words=words
+        );
+        let (res: Uint256) = keccak{keccak_ptr=keccak_ptr}(inputs=words, n_bytes=calldata_len);
+        finalize_keccak(keccak_ptr_start=keccak_ptr_start, keccak_ptr_end=keccak_ptr);
+        return (hash=res);
+    }
+
+    // @notice temporary
     func get_tx_hash{
         syscall_ptr: felt*,
         pedersen_ptr: HashBuiltin*,
@@ -212,14 +217,65 @@ namespace KETHAA {
         calldata: felt*
     ) -> (hash: Uint256) {
         alloc_locals;
+        let tx_type = [calldata];
+        let rlp_data = calldata + 1;  // remove the tx type
+        let (local fields: RLP.Field*) = alloc();
+        RLP.decode_rlp(calldata_len - 1, rlp_data, fields);  // decode array
+        if (tx_type == 2) {
+            let data_len: felt = [fields].data_len - SIGNATURE_LEN;
+            let (list_ptr: felt*) = alloc();
+            assert [list_ptr] = tx_type;
+            let (rlp_len: felt) = RLP.encode_rlp_list(data_len, [fields].data, list_ptr + 1);
+            let (keccak_ptr: felt*) = alloc();
+            let keccak_ptr_start = keccak_ptr;
+            let (words: felt*) = alloc();
+            let (words_len: felt) = RLP.bytes_to_words(
+                data_len=rlp_len + 1, data=list_ptr, words_len=0, words=words
+            );
+            let tx_hash = keccak{keccak_ptr=keccak_ptr}(inputs=words, n_bytes=rlp_len + 1);
+            finalize_keccak(keccak_ptr_start=keccak_ptr_start,keccak_ptr_end=keccak_ptr);
+            let (local sub_fields: RLP.Field*) = alloc();
+            RLP.decode_rlp([fields].data_len, [fields].data, sub_fields);
+            let v = RLP.bytes_to_felt(sub_fields[V_IDX].data_len, sub_fields[V_IDX].data, 0);
+          return (hash=tx_hash.res);
+        } else {
+            assert 1 = 0;
+            return (hash=Uint256(low=0,high=0));
+        }
+    }
+
+    // @notice temporary
+    func get_tx_sig{
+        syscall_ptr: felt*,
+        pedersen_ptr: HashBuiltin*,
+        bitwise_ptr: BitwiseBuiltin*,
+        range_check_ptr,
+    }(
+        calldata_len: felt, 
+        calldata: felt*
+    ) -> (v: felt, s: Uint256, r: Uint256) {
+        alloc_locals;
+        let tx_type = [calldata];
+        let rlp_data = calldata + 1;  // remove the tx type
+        let (local fields: RLP.Field*) = alloc();
+        RLP.decode_rlp(calldata_len - 1, rlp_data, fields);  // decode array
+        let data_len: felt = [fields].data_len - SIGNATURE_LEN;
+        let (list_ptr: felt*) = alloc();
+        assert [list_ptr] = tx_type;
+        let (rlp_len: felt) = RLP.encode_rlp_list(data_len, [fields].data, list_ptr + 1);
         let (keccak_ptr: felt*) = alloc();
         let keccak_ptr_start = keccak_ptr;
         let (words: felt*) = alloc();
         let (words_len: felt) = RLP.bytes_to_words(
-            data_len=calldata_len, data=calldata, words_len=0, words=words
+        data_len=rlp_len + 1, data=list_ptr, words_len=0, words=words
         );
-        let (res: Uint256) = keccak{keccak_ptr=keccak_ptr}(inputs=words, n_bytes=calldata_len);
-        finalize_keccak(keccak_ptr_start=keccak_ptr_start, keccak_ptr_end=keccak_ptr);
-        return (hash=res);
+        let tx_hash = keccak{keccak_ptr=keccak_ptr}(inputs=words, n_bytes=rlp_len + 1);
+        let (local sub_fields: RLP.Field*) = alloc();
+        RLP.decode_rlp([fields].data_len, [fields].data, sub_fields);
+        let v = RLP.bytes_to_felt(sub_fields[V_IDX].data_len, sub_fields[V_IDX].data, 0);
+        let r = RLP.bytes_to_uint256(data_len=32, data=sub_fields[R_IDX].data);
+        let s = RLP.bytes_to_uint256(data_len=32, data=sub_fields[S_IDX].data);
+        finalize_keccak(keccak_ptr_start=keccak_ptr_start,keccak_ptr_end=keccak_ptr);
+        return (v=v.n, s=s.res, r=r.res);
     }
 }
