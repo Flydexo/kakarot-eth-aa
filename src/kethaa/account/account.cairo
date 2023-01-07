@@ -99,6 +99,7 @@ func __execute__{
     response: felt*
 ) {
     let (response: felt*) = alloc();
+    // TODO: redirect calls
     return (response_len=0,response=response);
 }
 
@@ -154,51 +155,4 @@ func is_valid_signature{
     let msg_hash: Uint256 = Uint256(low=hash[0], high=hash[1]);
     let (is_valid) = KETHAA.is_valid_eth_signature(msg_hash, r, s,v, _eth_address);
     return (is_valid=is_valid);
-}
-
-// @notice temporary
-// @dev used to debug the hashing algorithm used to hash a transaction
-// @param raw_tx_len the lenth of the raw transaction (in bytes)
-// @param raw_tx the raw transaction (each item in array is a byte)
-// @return hash The calculated hash (uin256)
-@view 
-func get_tx_hash{
-    syscall_ptr: felt*,
-    pedersen_ptr: HashBuiltin*,
-    bitwise_ptr: BitwiseBuiltin*,
-    range_check_ptr,
-}(
-    raw_tx_len: felt,
-    raw_tx: felt*
-) -> (hash: Uint256) {
-    let (hash) = KETHAA.get_tx_hash(raw_tx_len, raw_tx);
-    return (hash=hash);
-}
-
-@view 
-func get_data_hash{
-    syscall_ptr: felt*,
-    pedersen_ptr: HashBuiltin*,
-    bitwise_ptr: BitwiseBuiltin*,
-    range_check_ptr,
-}(
-    raw_tx_len: felt,
-    raw_tx: felt*
-) -> (hash: Uint256) {
-    let (hash) = KETHAA.get_data_hash(raw_tx_len, raw_tx);
-    return (hash=hash);
-}
-
-@view 
-func get_tx_sig{
-    syscall_ptr: felt*,
-    pedersen_ptr: HashBuiltin*,
-    bitwise_ptr: BitwiseBuiltin*,
-    range_check_ptr,
-}(
-    raw_tx_len: felt,
-    raw_tx: felt*
-) -> (v: felt, s: Uint256, r: Uint256) {
-    let r = KETHAA.get_tx_sig(raw_tx_len, raw_tx);
-    return r;
 }

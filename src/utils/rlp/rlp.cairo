@@ -45,6 +45,11 @@ namespace RLP {
     return bytes_to_felt(data_len=data_len-1,data=data,n=n+byte*res);
   }
 
+  // @notice transform muliple bytes into a single felt (big endian)
+  // @param data_len The lenght of the bytes
+  // @param data The pointer to the bytes array
+  // @param n used for recursion, set to 0
+  // @return n the resultant felt in big endian
   func bytes_to_felt_big{
       syscall_ptr: felt*,
       pedersen_ptr: HashBuiltin*,
@@ -113,9 +118,9 @@ namespace RLP {
   ) -> (res: Uint256) {
    alloc_locals;
    let (n: felt) = bytes_to_felt_big(data_len=16,data=data,n=0);
-   local low = n;
-   let (n: felt) = bytes_to_felt_big(data_len=16,data=data+16,n=0);
    local high = n;
+   let (n: felt) = bytes_to_felt_big(data_len=16,data=data+16,n=0);
+   local low = n;
    return (res=Uint256(low=low,high=high));
   }
 
@@ -302,7 +307,10 @@ namespace RLP {
     return to_base_16(rs_len+1, rs+1,q);
   }
 
-  // @dev TODO: fix endian
+  // @notice transforms an array of 16'th remainders to bytes
+  // @param bytes The pointer which will be filled with the bytes
+  // @param rs_len The length of the remainders array
+  // @param rs The array of remainders
   func to_bytes{
      syscall_ptr: felt*,
      pedersen_ptr: HashBuiltin*,
@@ -327,7 +335,12 @@ namespace RLP {
 }
 
 
-  // @dev TODO: fix endian
+  // @notice encodes data into an rlp list
+  // @dev data must be rlp encoded before using this function
+  // @param data_len The lenght of the bytes to copy from
+  // @param data The pointer to the first byte in the array to copy from 
+  // @param rlp The pointer receiving the rlp encoded list
+  // @return rlp_len The length of the encoded list in bytes
   func encode_rlp_list{
       syscall_ptr: felt*,
       pedersen_ptr: HashBuiltin*,

@@ -4,14 +4,11 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "../"))
 import pytest
 import web3
 import pytest
-import array
 from starkware.starknet.testing.starknet import Starknet
-from eth_account.account import Account, SignedMessage
-from starkware.starknet.testing.contract import StarknetContract
 from starkware.starkware_utils.error_handling import StarkException
 from eth_keys import keys
 from utils.setup import setup_test_env
-from utils.signer import MockEthSigner
+from utils.signer import MockEthSigner, BaseSigner
 from utils.bits import to_uint, combine_ints 
 from eth_account._utils.legacy_transactions import serializable_unsigned_transaction_from_dict
 
@@ -49,6 +46,7 @@ async def test_eth_aa_signature():
     call_info = await account.is_valid_signature([*to_uint(web3.Web3.toInt(txhash))], [raw_tx.v, *to_uint(raw_tx.r), *to_uint(raw_tx.s)]).call()
     assert call_info.result.is_valid == True
     with pytest.raises(StarkException):
+        # test invalid signature
         await account.is_valid_signature([*to_uint(web3.Web3.toInt(os.urandom(32)))], [raw_tx.v, *to_uint(raw_tx.r), *to_uint(raw_tx.s)]).call()
 
 @pytest.mark.asyncio
@@ -56,73 +54,19 @@ async def test_execute():
     starknet = await Starknet.empty()
 
     (deployer, account, private_key, evm_address) = await setup_test_env(starknet)
-    eth_account = MockEthSigner(private_key)
+    eth_account = MockEthSigner(private_key=private_key)
 
-    evm_eoa = web3.Account.from_key(keys.PrivateKey(private_key_bytes=private_key))
+    evm_eoa = web3.Account.from_key(private_key)
     raw_tx = evm_eoa.sign_transaction(txdict)
 
-    tx = await eth_account.send_transaction(account, 1409719322379134103315153819531084269022823759702923787575976457644523059131, 'execute_at_address', raw_tx.rawTransaction)
+    await eth_account.send_transaction(account, 1409719322379134103315153819531084269022823759702923787575976457644523059131, 'execute_at_address', raw_tx.rawTransaction)
 
-    assert tx != None
-
-@pytest.mark.asyncio
-async def test_data_hash():
-    starknet = await Starknet.empty()
-
-    (deployer, account, private_key, evm_address) = await setup_test_env(starknet)
-    evm_eoa = web3.Account.from_key(private_key);
-    raw_tx = evm_eoa.sign_transaction(txdict)
-
-    rtx = array.array('B', bytes.fromhex(raw_tx.rawTransaction.hex()[2:])).tolist()
-
-    tx = await account.get_data_hash(rtx).call()
-
-    low = int.from_bytes(tx.result.hash.low.to_bytes(16, 'little'), 'big')
-    high = int.from_bytes(tx.result.hash.high.to_bytes(16, 'little'), 'big')
-
-    hash = combine_ints(low, high)
-    assert hash == web3.Web3.toInt(raw_tx.hash)
-
-
-@pytest.mark.asyncio
-async def test_tx_hash():
-    starknet = await Starknet.empty()
-
-    (deployer, account, private_key, evm_address) = await setup_test_env(starknet)
-    evm_eoa = web3.Account.from_key(private_key);
-    raw_tx = evm_eoa.sign_transaction(txdict)
-
-    tx_hash = serializable_unsigned_transaction_from_dict(txdict).hash()
-
-    rtx = array.array('B', bytes.fromhex(raw_tx.rawTransaction.hex()[2:])).tolist()
-
-    tx = await account.get_tx_hash(rtx).call()
-
-    low = int.from_bytes(tx.result.hash.low.to_bytes(16, 'big'), 'little')
-    high = int.from_bytes(tx.result.hash.high.to_bytes(16, 'big'), 'little')
-    hash = combine_ints(low, high)
-
-    assert hash == web3.Web3.toInt(tx_hash)
-
-@pytest.mark.asyncio
-async def test_tx_sig():
-    starknet = await Starknet.empty()
-
-    (deployer, account, private_key, evm_address) = await setup_test_env(starknet)
-    evm_eoa = web3.Account.from_key(private_key);
-    raw_tx = evm_eoa.sign_transaction(txdict)
-
-    tx_hash = serializable_unsigned_transaction_from_dict(txdict).hash()
-
-    rtx = array.array('B', bytes.fromhex(raw_tx.rawTransaction.hex()[2:])).tolist()
-
-    tx = await account.get_tx_sig(rtx).call()
-
-    s = combine_ints(tx.result.s.low, tx.result.s.high)
-
-    r = combine_ints(tx.result.r.low, tx.result.r.high)
-    assert tx.result.v == raw_tx.v
-
-    assert s == web3.Web3.toInt(raw_tx.s)
-
-    assert r == web3.Web3.toInt(raw_tx.r)
+    with pytest.raises(StarkException):
+        # incorect selector
+        await eth_account.send_transaction(account, 1409719322379134103315153819531084269022823759702923787575976457644523059131, 'incorrect_selector', raw_tx.rawTransaction)
+        # incorect target contract
+        await eth_account.send_transaction(account, 1409719322379134103315153819531084739497123759702923787575976457644523059131, 'execute_at_address', raw_tx.rawTransaction)
+        # incorect signature
+        evm_eoa = web3.Account.from_key(os.urandom(32))
+        raw_tx = evm_eoa.sign_transaction(txdict)
+        await eth_account.send_transaction(account, 1409719322379134103315153819531084269022823759702923787575976457644523059131, 'incorrect_selector', raw_tx.rawTransaction)
