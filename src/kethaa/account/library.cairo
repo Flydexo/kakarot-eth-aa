@@ -156,11 +156,19 @@ namespace KETHAA {
             let s = RLP.bytes_to_uint256(data_len=32, data=sub_fields[S_IDX].data);
             finalize_keccak(keccak_ptr_start=keccak_ptr_start,keccak_ptr_end=keccak_ptr);
             let (keccak_ptr: felt*) = alloc();
-            verify_eth_signature_uint256{keccak_ptr=keccak_ptr}(msg_hash=tx_hash.res, r=r.res, s=s.res, v=v.n, eth_address=eth_address);
+            with_attr error_message("Invalid Ethereum Transaction") {
+                verify_eth_signature_uint256{keccak_ptr=keccak_ptr}(msg_hash=tx_hash.res, r=r.res, s=s.res, v=v.n, eth_address=eth_address);
+            }
             return (is_valid=1);
         } else {
-            assert 1 = 0;
-            return (is_valid=0);
+            if(tx_type == 0) {
+                // TODO: implement legacy transaction
+            }else{
+                with_attr error_message("Unsupported transaction type"){
+                    assert 1 = 0;
+                    return (is_valid=0);
+                }
+            }
         }
     }
 

@@ -59,14 +59,17 @@ async def test_execute():
     evm_eoa = web3.Account.from_key(private_key)
     raw_tx = evm_eoa.sign_transaction(txdict)
 
-    await eth_account.send_transaction(account, 1409719322379134103315153819531084269022823759702923787575976457644523059131, 'execute_at_address', raw_tx.rawTransaction)
-
+    tx = await eth_account.send_transaction(account, 1409719322379134103315153819531084269022823759702923787575976457644523059131, 'execute_at_address', raw_tx.rawTransaction)
+    assert tx != None
     with pytest.raises(StarkException):
         # incorect selector
-        await eth_account.send_transaction(account, 1409719322379134103315153819531084269022823759702923787575976457644523059131, 'incorrect_selector', raw_tx.rawTransaction)
+        tx = await eth_account.send_transaction(account, 1409719322379134103315153819531084269022823759702923787575976457644523059131, 'incorrect_selector', raw_tx.rawTransaction)
+        assert tx != None
         # incorect target contract
-        await eth_account.send_transaction(account, 1409719322379134103315153819531084739497123759702923787575976457644523059131, 'execute_at_address', raw_tx.rawTransaction)
+        tx = await eth_account.send_transaction(account, 1409719322379134103315153819531084739497123759702923787575976457644523059131, 'execute_at_address', raw_tx.rawTransaction)
+        assert tx != None
         # incorect signature
         evm_eoa = web3.Account.from_key(os.urandom(32))
         raw_tx = evm_eoa.sign_transaction(txdict)
-        await eth_account.send_transaction(account, 1409719322379134103315153819531084269022823759702923787575976457644523059131, 'incorrect_selector', raw_tx.rawTransaction)
+        tx = await eth_account.send_transaction(account, 1409719322379134103315153819531084269022823759702923787575976457644523059131, 'incorrect_selector', raw_tx.rawTransaction)
+        assert tx != None
