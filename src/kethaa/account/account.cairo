@@ -11,6 +11,8 @@ from starkware.starknet.common.eth_utils import assert_eth_address_range
 from starkware.cairo.common.math_cmp import is_le_felt
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.cairo_secp.signature import verify_eth_signature_uint256
+from starkware.cairo.common.uint256 import Uint256
+// Account library
 from kethaa.account.library import KETHAA
 
 @storage_var
@@ -53,8 +55,7 @@ func __validate__{
 ) {
     alloc_locals;
     let (address) = eth_address.read();
-    KETHAA.is_valid_eth_tx(eth_address=address);
-    KETHAA.is_valid_kakarot_transaction(call_array_len, call_array);
+    KETHAA.are_valid_calls(eth_address=address,call_array_len=call_array_len,call_array=call_array,calldata_len=calldata_len,calldata=calldata);
     return ();
 }
 
@@ -98,6 +99,7 @@ func __execute__{
     response: felt*
 ) {
     let (response: felt*) = alloc();
+    // TODO: redirect calls
     return (response_len=0,response=response);
 }
 
@@ -129,7 +131,8 @@ func supports_interface{
 
 // @notice checks if the signature is valid
 // @dev returns true if the signature is signed by the account controller
-// @param hash The hash which was signed
+// @param hash_len The hash length which was signed
+// @param hash The hash [low_128_bits, high_128_bits]
 // @param signature_len The length of the signature array
 // @param signature The array of the ethereum signature (as v, r, s)
 @view
@@ -139,14 +142,17 @@ func is_valid_signature{
     bitwise_ptr: BitwiseBuiltin*,
     range_check_ptr,
 }(
-    //hash_len: felt,
-    //hash: felt*,
-    hash: felt,
+    hash_len: felt, // should be 2
+    hash: felt*, // should be [low, high]
     signature_len: felt,
     signature: felt*
 ) -> (is_valid: felt) {
     alloc_locals;
     let (_eth_address) = eth_address.read();
-    let (is_valid) = KETHAA.is_valid_eth_signature(hash, signature_len, signature, _eth_address);
+    let v: felt = signature[0];
+    let r: Uint256 = Uint256(low=signature[1], high=signature[2]);
+    let s: Uint256 = Uint256(low=signature[3], high=signature[4]);
+    let msg_hash: Uint256 = Uint256(low=hash[0], high=hash[1]);
+    let (is_valid) = KETHAA.is_valid_eth_signature(msg_hash, r, s,v, _eth_address);
     return (is_valid=is_valid);
 }

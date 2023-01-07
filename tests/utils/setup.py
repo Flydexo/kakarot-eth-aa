@@ -7,7 +7,7 @@ from typing import Tuple
 from eth_keys import keys
 
 async def setup_test_env(starknet: Starknet) -> Tuple[StarknetContract, StarknetContract, bytes, int]: 
-    private_key = os.urandom(32)
+    private_key = b'\x00*\xa1\x8e\xa4\xf6\xe9|2w=A\xc3\xa0T\xdd\xb9\xa8R\xfc\xf9wkw\'\x17>i\xfd,\xab"'
     tempAccount: Account = web3.eth.Account().from_key(private_key)
     evm_address = web3.Web3().toInt(hexstr=tempAccount.address) 
 
