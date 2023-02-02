@@ -10,7 +10,7 @@ packages = [{include = "kakarot"}]
 [tool.poetry.dependencies]
 python = ">=3.9,<3.10"
 cairo-lang = "0.10.3"
-openzeppelin-cairo-contracts = "^0.6.0"
+openzeppelin-cairo-contracts = "^0.6.1"
 amarna = "^0.1.5"
 
 [tool.poetry.group.dev.dependencies]
